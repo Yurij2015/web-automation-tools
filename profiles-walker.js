@@ -59,7 +59,7 @@ async function runBrowser(taskData) {
   //   password: profile.proxyPassword
   // })
 
-  const url = 'https://www.instagram.com/'
+  const url = process.env.TARGET_URL
   await page.goto(url, { waitUntil: 'domcontentloaded' })
 
   console.log('Page loaded')
