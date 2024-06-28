@@ -5,25 +5,23 @@ const fs = require('fs')
 const filePath = require('path')
 require('dotenv').config({ path: filePath.join(__dirname, '..', '.env') })
 axios.defaults.headers.common['Authorization'] = 'Bearer ' + process.env.BEARER_TOKEN
-const profileId = process.env.TEMPORARY_PROFILE_ID
+const profileId = process.argv[2]
 
 async function runBrowser(taskData) {
   console.log('Running browser...with task ' + taskData.id)
 
   let profilesList = JSON.parse(taskData.profiles_list)
   let workingProfile = taskData.profile
-  let lowerDelayLimit = taskData.lower_delay_limit
-  let upperDelayLimit = taskData.upper_delay_limit
+  let lowerDelayLimit = taskData.lower_delay_limit ?? 10000
+  let upperDelayLimit = taskData.upper_delay_limit ?? 30000
+  const randomDelay = () =>
+    lowerDelayLimit + Math.floor(Math.random() * (upperDelayLimit - lowerDelayLimit))
 
   const userDataDir = filePath.join(__dirname, '..', 'userDataDir', workingProfile.username)
 
   if (fs.existsSync(userDataDir)) {
     console.log('User data directory finded!')
     console.log(userDataDir)
-  } else {
-    console.log('User data directory does not finded!')
-    //in this case - login process should be started whrere we create user data directory
-    return
   }
 
   const browser = await puppeteer.launch({
@@ -64,12 +62,39 @@ async function runBrowser(taskData) {
 
   console.log('Page loaded')
 
-  console.log('Pause started ' + Date.now())
+  console.log('Pause before work started ' + Date.now())
+  await new Promise((r) => setTimeout(r, randomDelay()))
+  console.log('Pause before work finished' + Date.now())
 
-  await new Promise((r) => {
-    setTimeout(r, lowerDelayLimit + Math.floor(Math.random() * (upperDelayLimit - lowerDelayLimit)))
-  })
-  console.log('Pause finished' + Date.now())
+  const loginBlock = await page.$('input[name="username"]')
+
+  if (loginBlock) {
+    console.log('Pause before name input started ' + Date.now())
+    await new Promise((r) => setTimeout(r, randomDelay()))
+    console.log('Pause before name input finished' + Date.now())
+
+    await page.type('input[name="username"]', workingProfile.username, { delay: 100 })
+
+    console.log('Pause before password input started ' + Date.now())
+    await new Promise((r) => setTimeout(r, randomDelay()))
+    console.log('Pause before password input finished' + Date.now())
+
+    await page.type('input[name="password"]', workingProfile.password, { delay: 100 })
+
+    console.log('Pause after fill login form started ' + Date.now())
+    await new Promise((r) => setTimeout(r, randomDelay()))
+    console.log('Pause after fill login finished' + Date.now())
+
+    await new Promise((r) => setTimeout(r, 1000))
+
+    const submitButton = await page.waitForSelector(
+      '::-p-xpath(//*[@id="loginForm"]/div/div[3]/button)'
+    )
+
+    if (submitButton) {
+      await submitButton.click()
+    }
+  }
 
   console.log(profilesList)
 
@@ -86,18 +111,12 @@ async function runBrowser(taskData) {
 
       let pauseAfterScrollingStarted = new Date()
       console.log('Pause after scrolling started ' + pauseAfterScrollingStarted)
-      await new Promise((r) => {
-        setTimeout(
-          r,
-          lowerDelayLimit + Math.floor(Math.random() * (upperDelayLimit - lowerDelayLimit))
-        )
-      })
+      await new Promise((r) => setTimeout(r, randomDelay()))
       let pauseAfterScrollingFinished = new Date()
       console.log('Pause after scrolling finished ' + pauseAfterScrollingFinished)
 
       // TODO if page.title - not found, do not clkicking, and randorm make click, do not make click, make two click
-      // TODO detect count of followers and following, and save this data in histore (to analize account activity), check count of posts if  profilie is not private, check if profile is private, check avatar
-      // TODO change walking task status on running when task ongoig, and on finished when task finished
+      // TODO check count of posts if  profilie is not private, check if profile is private, check avatar
       console.log('Clicking on the page...')
       await page.evaluate(() => {
         const x = Math.floor(Math.random() * window.innerWidth)
@@ -105,6 +124,9 @@ async function runBrowser(taskData) {
         const element = document.elementFromPoint(x, y)
         if (element) {
           element.click()
+          console.log(`Clicked element at (${x}, ${y}):`, element)
+        } else {
+          console.log(`No element found at (${x}, ${y})`)
         }
       })
       console.log('Clicking finished')
@@ -114,12 +136,7 @@ async function runBrowser(taskData) {
 
       let pauseAfterWorkWithProfileStarted = new Date()
       console.log('Pause after work with profile started ' + pauseAfterWorkWithProfileStarted)
-      await new Promise((r) => {
-        setTimeout(
-          r,
-          lowerDelayLimit + Math.floor(Math.random() * (upperDelayLimit - lowerDelayLimit))
-        )
-      })
+      await new Promise((r) => setTimeout(r, randomDelay()))
       let pauseAfterWorkWithProfileFinished = new Date()
 
       console.log('Pause after work with profile finished ' + pauseAfterWorkWithProfileFinished)
