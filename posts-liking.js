@@ -6,8 +6,14 @@ const filePath = require('path')
 require('dotenv').config({ path: filePath.join(__dirname, '..', '.env') })
 axios.defaults.headers.common['Authorization'] = 'Bearer ' + process.env.BEARER_TOKEN
 const profileId = process.argv[2]
+const { isMobileIpAddress } = require('./helper')
+
 
 async function runBrowser(taskData) {
+  if (!await isMobileIpAddress()) {
+    return
+  }
+
   console.log('Running browser...with task ' + taskData.id)
 
   let profilesList = JSON.parse(taskData.profiles_list)
@@ -43,7 +49,7 @@ async function runBrowser(taskData) {
   } else {
     console.log('User data directory does not finded!')
     //in this case - login process should be started whrere we create user data directory
-    return
+    // return
   }
 
   const browser = await puppeteer.launch({
@@ -103,6 +109,10 @@ async function runBrowser(taskData) {
     countOfStories: 0
   }
 
+  const data = {
+    posts: null
+  }
+
   page.on('response', async (response) => {
     if (response.url().includes('/graphql/query')) {
       console.log('Response URL:', response.url())
@@ -111,6 +121,7 @@ async function runBrowser(taskData) {
       try {
         const dataObject = await JSON.parse(responseData)
         if (dataObject?.data?.xdt_api__v1__feed__user_timeline_graphql_connection) {
+          data.posts = dataObject.data.xdt_api__v1__feed__user_timeline_graphql_connection
           console.log(dataObject.data.xdt_api__v1__feed__user_timeline_graphql_connection)
         }
         if (dataObject?.data?.user) {
@@ -152,7 +163,7 @@ async function runBrowser(taskData) {
     await new Promise((r) => setTimeout(r, randomDelay()))
     console.log('Pause after fill login finished' + Date.now())
 
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 1000))
 
     const submitButton = await page.waitForSelector(
       '::-p-xpath(//*[@id="loginForm"]/div/div[3]/button)'
@@ -161,42 +172,193 @@ async function runBrowser(taskData) {
     if (submitButton) {
       await submitButton.click()
     }
+
+    console.log('Pause after submit ' + Date.now())
+    await new Promise((r) => setTimeout(r, randomDelay()))
+    console.log('Pause after submit' + Date.now())
   }
 
-  let pauseBeforeFollowingStarted = 0
-  let pauseBeforeFollowingFinished = 0
-  let followingButtonClickedTime = 0
-  let pauseAfterFollowingStarted = 0
-  let pauseAfterFollowingFinished = 0
+  let pauseBeforeLikingStarted = 0
+  let pauseBeforeLikingFinished = 0
+  let likeButtonClickTime = 0
+  let pauseAfterLikingStarted = 0
+  let pauseAfterLikingFinished = 0
 
   if (Array.isArray(profilesList) && profilesList.length > 0) {
     for (const profileLogin of profilesList) {
       console.log('Go to page ' + profileLogin)
-      await page.goto(url + profileLogin, { waitUntil: 'domcontentloaded' })
-
-      pauseBeforeFollowingStarted = new Date()
-      console.log('Pause before following started ' + pauseBeforeFollowingStarted)
-      await new Promise((r) => setTimeout(r, randomDelay()))
-      pauseBeforeFollowingFinished = new Date()
-      console.log('Pause before following finished ' + pauseBeforeFollowingFinished)
 
       try {
-        let button = await page.locator('::-p-aria([name="Follow"][role="button"])')
-        if (button) {
-          console.log('Follow button founded!')
-          await button.click()
-          followingButtonClickedTime = new Date()
-          console.log('Follow button clicked!')
-        }
+        await page.goto(url + profileLogin, { waitUntil: 'domcontentloaded' })
+        console.log(`Successfully opened: ${url + profileLogin}`)
       } catch (error) {
-        console.error('Error finding or clickint follow button:', error)
+        console.error('Error opening profile page:', error)
+        continue
       }
 
-      pauseAfterFollowingStarted = new Date()
-      console.log('Pause after following started ' + pauseAfterFollowingStarted)
+      let pauseBeforePostOpenStarted = new Date()
+      console.log('Pause before post block open started ' + pauseBeforePostOpenStarted)
       await new Promise((r) => setTimeout(r, randomDelay()))
-      pauseAfterFollowingFinished = new Date()
-      console.log('Pause after following finished ' + pauseAfterFollowingFinished)
+      let pauseBeforePostOpenFinished = new Date()
+      console.log('Pause before post block open finished ' + pauseBeforePostOpenFinished)
+
+      if (
+        sharedData.countOfFollowers < lowerLimitOfFollowers ||
+        sharedData.countOfPosts < lowerPostsLimit
+      ) {
+        console.log('Profile is not suitable. Too few followers or posts')
+        continue
+      }
+
+      if (Array.isArray(data.posts.edges) && data.posts.edges.length > 0) {
+        for (const post of data.posts.edges) {
+          let postNode = post.node
+          console.log('data post node')
+          console.log(postNode)
+
+          let pauseBeforePostOpenStarted = new Date()
+          console.log('Pause before post open started ' + pauseBeforePostOpenStarted)
+          await new Promise((r) => setTimeout(r, randomDelay()))
+          let pauseBeforePostOpenFinished = new Date()
+          console.log('Pause before post open finished ' + pauseBeforePostOpenFinished)
+
+          const postUrl = url + 'p/' + postNode.code
+          const countOfLikes = postNode.like_count
+          console.log('Post URL:', postUrl)
+
+          try {
+            await page.goto(postUrl, { waitUntil: 'domcontentloaded' })
+            console.log(`Successfully opened: ${postUrl}`)
+          } catch (error) {
+            console.error('Error opening post page:', error)
+            continue
+          }
+
+          // const likeSpan = await page.waitForSelector('svg[aria-label="Like"]')
+          // const likeButtonXPath = `(.//*[normalize-space(text()) and normalize-space(.)='Follow'])[2]/following::*[name()='svg'][2]`
+          // const likeButton = await page.waitForSelector(`::-p-xpath(${likeButtonXPath})`)
+
+          const likeButton = await page.waitForSelector(
+            '::-p-xpath(//section[1]/div[1]/span[1]/div)'
+          )
+
+          // await page
+          //   .waitForSelector('::-p-xpath(//section[1]/div[1]/span[1]/div)')
+          //   .then(async (r) => {
+          //     console.log('Like button found')
+          //     let boundingBox = await r.boundingBox()
+          //     await new Promise((r) => setTimeout(r, randomDelay()))
+          //     // await r.click()
+          //     await page.mouse.click(
+          //       boundingBox.x + boundingBox.width / 2,
+          //       boundingBox.y + boundingBox.height / 2
+          //     )
+          //   })
+
+          if (likeButton) {
+            const boundingBox = await likeButton.boundingBox()
+            console.log('Bounding Box:', boundingBox)
+
+            pauseBeforeLikingStarted = new Date()
+            console.log('Pause before liking started ' + pauseBeforeLikingStarted)
+            await new Promise((r) => setTimeout(r, randomDelay()))
+            pauseBeforeLikingFinished = new Date()
+            console.log('Pause before liking finished ' + pauseBeforeLikingFinished)
+
+            console.log('Like button found')
+
+            if (countOfLikes > Math.floor(Math.random() * 4) + 1) {
+              try {
+                await page.mouse.move(
+                  boundingBox.x + boundingBox.width / 2,
+                  boundingBox.y + boundingBox.height / 2
+                )
+                await page.mouse.down()
+                await new Promise((r) => setTimeout(r, 100))
+                await page.mouse.up()
+                console.log('Like button clicked')
+              } catch (error) {
+                console.error('Error clicking like button:', error)
+              }
+
+              likeButtonClickTime = new Date()
+            } else {
+              likeButtonClickTime = 'filtered by count of likes'
+            }
+
+            pauseAfterLikingStarted = new Date()
+            console.log('Pause after liking started ' + pauseAfterLikingStarted)
+            await new Promise((r) => setTimeout(r, randomDelay()))
+            pauseAfterLikingFinished = new Date()
+            console.log('Pause after liking finished ' + pauseAfterLikingFinished)
+
+          } else {
+            console.log('Like button not found')
+          }
+
+          let pauseAfterPostOpenStarted = new Date()
+          console.log('Pause before post open started ' + pauseAfterPostOpenStarted)
+          await new Promise((r) => setTimeout(r, randomDelay()))
+          let pauseAfterPostOpenFinished = new Date()
+          console.log('Pause before post open finished ' + pauseAfterPostOpenFinished)
+
+          console.log('Scrolling...')
+          await page.evaluate(() => {
+            window.scrollBy(0, Math.random() * 1000)
+          })
+          console.log('Scrolling finished')
+
+          let pauseAfterScrollingStarted = new Date()
+          console.log('Pause after scrolling started ' + pauseAfterScrollingStarted)
+          await new Promise((r) => setTimeout(r, randomDelay()))
+          let pauseAfterScrollingFinished = new Date()
+          console.log('Pause after scrolling finished ' + pauseAfterScrollingFinished)
+          console.log('Clicking on the page...')
+          await page.evaluate(() => {
+            const x = Math.floor(Math.random() * window.innerWidth)
+            const y = Math.floor(Math.random() * window.innerHeight)
+            const element = document.elementFromPoint(x, y)
+            if (element) {
+              element.click()
+            }
+          })
+          console.log('Clicking finished')
+
+          const pageTitle = await page.title()
+          console.log(`Page title is: ${pageTitle}`)
+
+          let pauseAfterWorkWithProfileStarted = new Date()
+          console.log('Pause after work with profile started ' + pauseAfterWorkWithProfileStarted)
+          await new Promise((r) => setTimeout(r, randomDelay()))
+          let pauseAfterWorkWithProfileFinished = new Date()
+
+          console.log('Pause after work with profile finished ' + pauseAfterWorkWithProfileFinished)
+          await logLikingActivity(
+            taskData.id,
+            workingProfile.id,
+            workingProfile.username,
+            profileLogin,
+            sharedData.countOfFollowers,
+            sharedData.countOfFollowings,
+            sharedData.countOfPosts,
+            sharedData.countOfStories,
+            pageTitle,
+            pauseAfterScrollingStarted,
+            pauseAfterScrollingFinished,
+            pauseBeforeLikingStarted,
+            pauseBeforeLikingFinished,
+            postNode.code,
+            postUrl,
+            countOfLikes,
+            postNode.comment_count,
+            likeButtonClickTime,
+            pauseAfterLikingStarted,
+            pauseAfterLikingFinished,
+            pauseAfterWorkWithProfileStarted,
+            pauseAfterWorkWithProfileFinished
+          ).then((r) => console.log(r))
+        }
+      }
 
       console.log('Scrolling...')
       await page.evaluate(() => {
@@ -232,27 +394,6 @@ async function runBrowser(taskData) {
       let pauseAfterWorkWithProfileFinished = new Date()
 
       console.log('Pause after work with profile finished ' + pauseAfterWorkWithProfileFinished)
-
-      await logFollowingActivity(
-        taskData.id,
-        workingProfile.id,
-        workingProfile.username,
-        profileLogin,
-        sharedData.countOfFollowers,
-        sharedData.countOfFollowings,
-        sharedData.countOfPosts,
-        sharedData.countOfStories,
-        pageTitle,
-        pauseAfterScrollingStarted,
-        pauseAfterScrollingFinished,
-        pauseBeforeFollowingStarted,
-        pauseBeforeFollowingFinished,
-        followingButtonClickedTime,
-        pauseAfterFollowingStarted,
-        pauseAfterFollowingFinished,
-        pauseAfterWorkWithProfileStarted,
-        pauseAfterWorkWithProfileFinished
-      ).then((r) => console.log(r))
     }
   } else {
     console.log('Profile list is not an array')
@@ -290,7 +431,7 @@ async function handleResponse(response) {
   return 'Handling response finished!'
 }
 
-async function logFollowingActivity(
+async function logLikingActivity(
   taskDataId,
   workingProfileId,
   worknigProfileUserName,
@@ -302,17 +443,21 @@ async function logFollowingActivity(
   pageTitle,
   pauseAfterScrollingStarted,
   pauseAfterScrollingFinished,
-  pauseBeforeFollowingStarted,
-  pauseBeforeFollowingFinished,
-  followingButtonClickedTime,
-  pauseAfterFollowingStarted,
-  pauseAfterFollowingFinished,
+  pauseBeforeLikingStarted,
+  pauseBeforeLikingFinished,
+  postCode,
+  postUrl,
+  countOfLikes,
+  countOfComments,
+  likeButtonClickTime,
+  pauseAfterLikingStarted,
+  pauseAfterLikingFinished,
   pauseAfterWorkWithProfileStarted,
   pauseAfterWorkWithProfileFinished
 ) {
   try {
-    const response = await axios.post(process.env.HOST + process.env.FOLLOWING_HISTORY_URL_PATH, {
-      following_task_id: taskDataId,
+    const response = await axios.post(process.env.HOST + process.env.LIKING_HISTORY_URL_PATH, {
+      liking_task_id: taskDataId,
       working_profile_id: workingProfileId,
       working_profile_username: worknigProfileUserName,
       handled_profile_login: profileLogin,
@@ -323,11 +468,15 @@ async function logFollowingActivity(
       page_title: pageTitle,
       pause_after_scrolling_started: pauseAfterScrollingStarted,
       pause_after_scrolling_finished: pauseAfterScrollingFinished,
-      pause_before_following_started: pauseBeforeFollowingStarted,
-      pause_before_following_finished: pauseBeforeFollowingFinished,
-      following_button_click_time: followingButtonClickedTime,
-      pause_after_following_started: pauseAfterFollowingStarted,
-      pause_after_following_finished: pauseAfterFollowingFinished,
+      pause_before_liking_started: pauseBeforeLikingStarted,
+      pause_before_liking_finished: pauseBeforeLikingFinished,
+      profile_post_id: postCode,
+      profile_post_url: postUrl,
+      count_of_likes: countOfLikes,
+      count_of_comments: countOfComments,
+      like_button_click_time: likeButtonClickTime,
+      pause_after_liking_started: pauseAfterLikingStarted,
+      pause_after_liking_finished: pauseAfterLikingFinished,
       pause_after_work_with_profile_started: pauseAfterWorkWithProfileStarted,
       pause_after_work_with_profile_finished: pauseAfterWorkWithProfileFinished
     })
@@ -338,7 +487,7 @@ async function logFollowingActivity(
   }
 }
 
-fetchDataAndExecuteTask(process.env.HOST + process.env.FOLLOWING_URL_PATH)
+fetchDataAndExecuteTask(process.env.HOST + process.env.LIKING_URL_PATH)
   .then((response) => {
     console.log('Task data is fetched!')
     handleResponse(response).then((r) => console.log(r))
