@@ -8,7 +8,6 @@ axios.defaults.headers.common['Authorization'] = 'Bearer ' + process.env.BEARER_
 const profileId = process.argv[2]
 const { isMobileIpAddress } = require('./helper')
 
-
 async function runBrowser(taskData) {
   if (!await isMobileIpAddress()) {
     return
@@ -226,6 +225,10 @@ async function runBrowser(taskData) {
           const countOfLikes = postNode.like_count
           console.log('Post URL:', postUrl)
 
+          // if (countOfLikes < Math.floor(Math.random() * 4) + 1) {
+          //   continue
+          // }
+
           try {
             await page.goto(postUrl, { waitUntil: 'domcontentloaded' })
             console.log(`Successfully opened: ${postUrl}`)
@@ -234,26 +237,9 @@ async function runBrowser(taskData) {
             continue
           }
 
-          // const likeSpan = await page.waitForSelector('svg[aria-label="Like"]')
-          // const likeButtonXPath = `(.//*[normalize-space(text()) and normalize-space(.)='Follow'])[2]/following::*[name()='svg'][2]`
-          // const likeButton = await page.waitForSelector(`::-p-xpath(${likeButtonXPath})`)
-
           const likeButton = await page.waitForSelector(
             '::-p-xpath(//section[1]/div[1]/span[1]/div)'
           )
-
-          // await page
-          //   .waitForSelector('::-p-xpath(//section[1]/div[1]/span[1]/div)')
-          //   .then(async (r) => {
-          //     console.log('Like button found')
-          //     let boundingBox = await r.boundingBox()
-          //     await new Promise((r) => setTimeout(r, randomDelay()))
-          //     // await r.click()
-          //     await page.mouse.click(
-          //       boundingBox.x + boundingBox.width / 2,
-          //       boundingBox.y + boundingBox.height / 2
-          //     )
-          //   })
 
           if (likeButton) {
             const boundingBox = await likeButton.boundingBox()
