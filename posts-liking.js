@@ -9,7 +9,7 @@ const profileId = process.argv[2]
 const { isMobileIpAddress } = require('./helper')
 
 async function runBrowser(taskData) {
-  if (!await isMobileIpAddress()) {
+  if (!(await isMobileIpAddress())) {
     return
   }
 

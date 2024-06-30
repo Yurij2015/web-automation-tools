@@ -3,11 +3,15 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 const axios = require('axios')
 const fs = require('fs')
 const filePath = require('path')
+const { isMobileIpAddress } = require('./helper')
 require('dotenv').config({ path: filePath.join(__dirname, '..', '.env') })
 axios.defaults.headers.common['Authorization'] = 'Bearer ' + process.env.BEARER_TOKEN
 const profileId = process.argv[2]
 
 async function runBrowser(taskData) {
+  if (!(await isMobileIpAddress())) {
+    return
+  }
   console.log('Running browser...with task ' + taskData.id)
 
   let profilesList = JSON.parse(taskData.profiles_list)
