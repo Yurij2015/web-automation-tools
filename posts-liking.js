@@ -7,8 +7,9 @@ require('dotenv').config({ path: filePath.join(__dirname, '..', '.env') })
 axios.defaults.headers.common['Authorization'] = 'Bearer ' + process.env.BEARER_TOKEN
 const profileId = process.argv[2]
 const { isMobileIpAddress } = require('./helper')
-
+const chalk = require('chalk')
 async function runBrowser(taskData) {
+
   if (!(await isMobileIpAddress())) {
     return
   }
@@ -132,16 +133,16 @@ async function runBrowser(taskData) {
           console.log(user)
         }
       } catch (error) {
-        console.error('Error parsing response data:', error)
+        console.error(chalk.red('Error parsing response data:'), error);
       }
     }
   })
 
   await page.goto(url, { waitUntil: 'domcontentloaded' })
 
-  console.log('Pause before work started ' + Date.now())
+  console.log(chalk.green('Pause before work started ' + Date.now()))
   await new Promise((r) => setTimeout(r, randomDelay()))
-  console.log('Pause before work finished' + Date.now())
+  console.log(chalk.blue('Pause before work finished' + Date.now()))
 
   const loginBlock = await page.$('input[name="username"]')
 
@@ -172,7 +173,7 @@ async function runBrowser(taskData) {
       await submitButton.click()
     }
 
-    console.log('Pause after submit ' + Date.now())
+    console.log(chalk.yellow('Pause after submit ' + Date.now()))
     await new Promise((r) => setTimeout(r, randomDelay()))
     console.log('Pause after submit' + Date.now())
   }
@@ -189,37 +190,112 @@ async function runBrowser(taskData) {
 
       try {
         await page.goto(url + profileLogin, { waitUntil: 'domcontentloaded' })
-        console.log(`Successfully opened: ${url + profileLogin}`)
+        console.log(chalk.magenta(`Successfully opened: ${url + profileLogin}`))
       } catch (error) {
-        console.error('Error opening profile page:', error)
+        console.error(chalk.red('Error opening profile page:'), error)
         continue
       }
 
       let pauseBeforePostOpenStarted = new Date()
-      console.log('Pause before post block open started ' + pauseBeforePostOpenStarted)
+      console.log(
+        chalk.cyanBright('Pause before post block open started ' + pauseBeforePostOpenStarted)
+      )
       await new Promise((r) => setTimeout(r, randomDelay()))
       let pauseBeforePostOpenFinished = new Date()
-      console.log('Pause before post block open finished ' + pauseBeforePostOpenFinished)
+      console.log(chalk.cyan('Pause before post block open finished ' + pauseBeforePostOpenFinished))
 
       if (
         sharedData.countOfFollowers < lowerLimitOfFollowers ||
         sharedData.countOfPosts < lowerPostsLimit
       ) {
-        console.log('Profile is not suitable. Too few followers or posts')
+        console.log(chalk.green('Profile is not suitable. Too few followers or posts'))
         continue
       }
 
-      if (Array.isArray(data.posts.edges) && data.posts.edges.length > 0) {
+      let postsEdges = null
+
+      try {
+        postsEdges = data.posts.edges
+      } catch (error) {
+        console.error(chalk.red('Error parsing response data:'), error)
+        continue
+      }
+
+      if (Array.isArray(postsEdges) && postsEdges.length > 0) {
         for (const post of data.posts.edges) {
-          let postNode = post.node
+
+          const threshold = 0.4 + Math.random() * 0.2;
+          if (Math.random() < threshold) {
+            console.log(chalk.magenta(`Skipping iteration due to random continue`))
+            continue;
+          }
+
+          let postNode = null
+          try{
+            postNode = post.node
+          } catch (error) {
+            console.error(chalk.red('Error parsing response data:'), error)
+            continue
+          }
+
           console.log('data post node')
           console.log(postNode)
+
+          let takenAt = postNode.taken_at
+          let captionText = postNode.caption?.text ?? 'null'
+
+          const twentyDaysAfterPostTakenAt = takenAt + (20 * 24 * 60 * 60)
+          const currentTimestamp = Math.floor(Date.now() / 1000)
+
+          if (currentTimestamp > twentyDaysAfterPostTakenAt) {
+            console.log(
+              chalk.magentaBright(
+                'Current timestamp is older than 20 days from the given timestamp.'
+              )
+            )
+            continue
+          } else {
+            console.log(
+              chalk.greenBright(
+                'Current timestamp is not older than 20 days from the given timestamp. Going to make like.'
+              )
+            )
+          }
+
+          const sensitiveWords = [
+            'hate',
+            'violence',
+            'kill',
+            'suicide',
+            'abuse',
+            'explicit',
+            'drugs',
+            'scam',
+            'death',
+            'demise',
+            'mortality',
+            'bullying',
+            'mockery',
+            'abuse',
+            'mocking'
+          ]
+
+          const containsSensitiveWord = sensitiveWords.some((word) =>
+            captionText.toLowerCase().includes(word.toLowerCase())
+          )
+
+          if (containsSensitiveWord) {
+            console.log('Post contains sensitive content. Skipping...')
+            continue
+          } else {
+            console.log('Post does not contain sensitive content. Proceeding with like...');
+          }
 
           let pauseBeforePostOpenStarted = new Date()
           console.log('Pause before post open started ' + pauseBeforePostOpenStarted)
           await new Promise((r) => setTimeout(r, randomDelay()))
           let pauseBeforePostOpenFinished = new Date()
-          console.log('Pause before post open finished ' + pauseBeforePostOpenFinished)
+          console.log(chalk.cyan('Pause before post open finished ' + pauseBeforePostOpenFinished))
 
           const postUrl = url + 'p/' + postNode.code
           const countOfLikes = postNode.like_count
@@ -233,7 +309,7 @@ async function runBrowser(taskData) {
             await page.goto(postUrl, { waitUntil: 'domcontentloaded' })
             console.log(`Successfully opened: ${postUrl}`)
           } catch (error) {
-            console.error('Error opening post page:', error)
+            console.error(chalk.red('Error opening post page:'), error)
             continue
           }
 
@@ -246,10 +322,10 @@ async function runBrowser(taskData) {
             console.log('Bounding Box:', boundingBox)
 
             pauseBeforeLikingStarted = new Date()
-            console.log('Pause before liking started ' + pauseBeforeLikingStarted)
+            console.log(chalk.green('Pause before liking started ' + pauseBeforeLikingStarted))
             await new Promise((r) => setTimeout(r, randomDelay()))
             pauseBeforeLikingFinished = new Date()
-            console.log('Pause before liking finished ' + pauseBeforeLikingFinished)
+            console.log(chalk.blue('Pause before liking finished ' + pauseBeforeLikingFinished))
 
             console.log('Like button found')
 
@@ -262,9 +338,9 @@ async function runBrowser(taskData) {
                 await page.mouse.down()
                 await new Promise((r) => setTimeout(r, 100))
                 await page.mouse.up()
-                console.log('Like button clicked')
+                console.log(chalk.bold.magenta('Like button clicked'))
               } catch (error) {
-                console.error('Error clicking like button:', error)
+                console.error(chalk.red('Error clicking like button:', error))
               }
 
               likeButtonClickTime = new Date()
@@ -273,20 +349,20 @@ async function runBrowser(taskData) {
             }
 
             pauseAfterLikingStarted = new Date()
-            console.log('Pause after liking started ' + pauseAfterLikingStarted)
+            console.log(chalk.blue('Pause after liking started ' + pauseAfterLikingStarted))
             await new Promise((r) => setTimeout(r, randomDelay()))
             pauseAfterLikingFinished = new Date()
-            console.log('Pause after liking finished ' + pauseAfterLikingFinished)
+            console.log(chalk.cyan('Pause after liking finished ' + pauseAfterLikingFinished))
 
           } else {
             console.log('Like button not found')
           }
 
           let pauseAfterPostOpenStarted = new Date()
-          console.log('Pause before post open started ' + pauseAfterPostOpenStarted)
+          console.log(chalk.magenta('Pause before post open started ' + pauseAfterPostOpenStarted))
           await new Promise((r) => setTimeout(r, randomDelay()))
           let pauseAfterPostOpenFinished = new Date()
-          console.log('Pause before post open finished ' + pauseAfterPostOpenFinished)
+          console.log(chalk.magentaBright('Pause before post open finished ' + pauseAfterPostOpenFinished))
 
           console.log('Scrolling...')
           await page.evaluate(() => {
@@ -295,7 +371,7 @@ async function runBrowser(taskData) {
           console.log('Scrolling finished')
 
           let pauseAfterScrollingStarted = new Date()
-          console.log('Pause after scrolling started ' + pauseAfterScrollingStarted)
+          console.log(chalk.blue('Pause after scrolling started ' + pauseAfterScrollingStarted))
           await new Promise((r) => setTimeout(r, randomDelay()))
           let pauseAfterScrollingFinished = new Date()
           console.log('Pause after scrolling finished ' + pauseAfterScrollingFinished)
@@ -311,14 +387,14 @@ async function runBrowser(taskData) {
           console.log('Clicking finished')
 
           const pageTitle = await page.title()
-          console.log(`Page title is: ${pageTitle}`)
+          console.log(chalk.cyan(`Page title is: ${pageTitle}`))
 
           let pauseAfterWorkWithProfileStarted = new Date()
-          console.log('Pause after work with profile started ' + pauseAfterWorkWithProfileStarted)
+          console.log(chalk.yellow('Pause after work with profile started ' + pauseAfterWorkWithProfileStarted))
           await new Promise((r) => setTimeout(r, randomDelay()))
           let pauseAfterWorkWithProfileFinished = new Date()
 
-          console.log('Pause after work with profile finished ' + pauseAfterWorkWithProfileFinished)
+          console.log(chalk.green('Pause after work with profile finished ' + pauseAfterWorkWithProfileFinished))
           await logLikingActivity(
             taskData.id,
             workingProfile.id,
@@ -372,7 +448,7 @@ async function runBrowser(taskData) {
       console.log('Clicking finished')
 
       const pageTitle = await page.title()
-      console.log(`Page title is: ${pageTitle}`)
+      console.log(chalk.cyan(`Page title is: ${pageTitle}`))
 
       let pauseAfterWorkWithProfileStarted = new Date()
       console.log('Pause after work with profile started ' + pauseAfterWorkWithProfileStarted)
