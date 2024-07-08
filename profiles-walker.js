@@ -98,12 +98,15 @@ async function runBrowser(taskData) {
     if (submitButton) {
       await submitButton.click()
     }
+    await new Promise((r) => setTimeout(r, randomDelay()))
   }
 
   console.log(profilesList)
 
   if (Array.isArray(profilesList) && profilesList.length > 0) {
+    await new Promise((r) => setTimeout(r, randomDelay()))
     for (const profileLogin of profilesList) {
+      await new Promise((r) => setTimeout(r, randomDelay()))
       console.log('Go to page of # ' + profileLogin)
       await page.goto(url + profileLogin, { waitUntil: 'domcontentloaded' })
 
@@ -127,7 +130,11 @@ async function runBrowser(taskData) {
         const y = Math.floor(Math.random() * window.innerHeight)
         const element = document.elementFromPoint(x, y)
         if (element) {
-          element.click()
+          element.click({
+            button: 'left',
+            clickCount: 1,
+            delay: 100
+          })
           console.log(`Clicked element at (${x}, ${y}):`, element)
         } else {
           console.log(`No element found at (${x}, ${y})`)
