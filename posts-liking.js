@@ -376,15 +376,20 @@ async function runBrowser(taskData) {
           let pauseAfterScrollingFinished = new Date()
           console.log('Pause after scrolling finished ' + pauseAfterScrollingFinished)
           console.log('Clicking on the page...')
-          await page.evaluate(() => {
-            const x = Math.floor(Math.random() * window.innerWidth)
-            const y = Math.floor(Math.random() * window.innerHeight)
-            const element = document.elementFromPoint(x, y)
-            if (element) {
-              element.click()
-            }
-          })
-          console.log('Clicking finished')
+
+          try {
+            await page.evaluate(() => {
+              const x = Math.floor(Math.random() * window.innerWidth)
+              const y = Math.floor(Math.random() * window.innerHeight)
+              const element = document.elementFromPoint(x, y)
+              if (element) {
+                element.click()
+              }
+            })
+            console.log('Clicking finished')
+          } catch (error) {
+            console.error('Error clicking on the page:', error)
+          }
 
           const pageTitle = await page.title()
           console.log(chalk.cyan(`Page title is: ${pageTitle}`))

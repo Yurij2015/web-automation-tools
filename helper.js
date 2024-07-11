@@ -91,6 +91,8 @@ async function getPhoneNumber(isoCode, service) {
 }
 
 async function receiveSms(orderId) {
+  console.log(chalk.red.bold("order id"))
+  console.log(orderId)
   if (!process.env.SMS_PVA_TOKEN) {
     throw new Error('SMS_PVA_TOKEN environment variable is not defined')
   }
@@ -99,6 +101,39 @@ async function receiveSms(orderId) {
 
   try {
     const response = await axios.get(url, {
+      headers: {
+        apikey: process.env.SMS_PVA_TOKEN
+      }
+    })
+    const smsData = response.data.data
+
+    console.log(chalk.red.bold('SMS DATA'))
+    console.log(chalk.red(smsData))
+
+    console.log('SMS:', smsData.sms.code)
+    return smsData.sms.code
+  } catch (error) {
+    console.error('Error fetching SMS:', error)
+    return 'Error fetching SMS'
+  }
+}
+
+async function moveToBan(orderId, service) {
+  if (!process.env.SMS_PVA_TOKEN) {
+    throw new Error('SMS_PVA_TOKEN environment variable is not defined')
+  }
+
+  const urlBan = 'https://smspva.com/priemnik.php'
+
+  try {
+    const response = await axios.get(urlBan, {
+      params: {
+        apikey: process.env.SMS_PVA_TOKEN,
+        service: service,
+        id: orderId,
+        metod: 'ban',
+        method: 'ban'
+      },
       headers: {
         apikey: process.env.SMS_PVA_TOKEN
       }
@@ -129,4 +164,4 @@ async function checkBalance(){
   }
 }
 
-module.exports = { isMobileIpAddress, getIsoCodeFromCountryName, getPhoneNumber, receiveSms, checkBalance }
+module.exports = { isMobileIpAddress, getIsoCodeFromCountryName, getPhoneNumber, receiveSms, checkBalance, moveToBan }
